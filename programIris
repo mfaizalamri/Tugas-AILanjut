@@ -1,0 +1,141 @@
+import csv
+import random
+import math
+import matplotlib.pyplot as plt
+random.seed(5)
+
+# Load dataset from csv file
+def load_csv(filename):
+    dataset = []
+    with open(filename, 'r') as file:
+        csv_reader = csv.reader(file)
+        next(csv_reader)
+        for row in csv_reader:
+            features = [float(x) for x in row[:-1]]
+            label = int(row[-1])
+            dataset.append(features+[label])
+    return dataset
+
+# Perceptron functions
+def activation(x):
+    return 1 / (1 + math.exp(-x)) # sigmoid
+
+def predict(inputs, weights):
+    z = weights[0] # bias
+    for i in range(len(inputs)):
+        z += inputs[i] * weights[i+1] # dot product
+    return activation(z)
+
+def train_slp(train_data, test_data, lr=0.1, epochs=1):
+    n_feats = len(train_data[0])-1
+    
+    # inisialisasi bobot random
+    weights = [random.uniform(-0.5, 0.5) for _ in range(n_feats+1)] # bias + weights
+    # weights = [0.5 for _ in range(n_feats+1)] 
+    
+    train_loss, train_acc = [], []
+    val_loss, val_acc = [], []
+    
+    for epoch in range(epochs):
+        total_error = 0
+        tr_correct = 0
+        for row in train_data:
+            inputs = row[:-1]
+            target = row[-1]
+            
+            # forward
+            y_pred = predict(inputs, weights)
+            
+            # error
+            error = y_pred - target
+            total_error += error**2
+            
+            # update bias & bobot
+            delta_bias = 2 * (y_pred - target) * (1 - y_pred) * y_pred * 1.0
+            weights[0] -= lr * delta_bias
+            
+            for i in range(n_feats):
+                delta_theta = 2 * (y_pred - target) * (1 - y_pred) * y_pred * inputs[i]
+                weights[i+1] -= lr * delta_theta
+            
+            # accuracy
+            pred = 1 if y_pred >= 0.5 else 0
+            if pred == target:
+                tr_correct += 1
+                
+        # Compute loss & acc train
+        train_loss.append(total_error)
+        train_acc.append(tr_correct/len(train_data))
+        
+        # Compute loss & acc test
+        val_error = 0
+        val_correct = 0
+        for row in test_data:
+            val_prob = predict(row[:-1], weights)
+            val_error += (val_prob - row[-1])**2
+            
+            val_pred = 1 if val_prob >= 0.5 else 0
+            if val_pred == row[-1]:
+                val_correct += 1
+            
+        val_loss.append(val_error)
+        val_acc.append(val_correct/len(test_data))
+
+        print(f"Epoch {epoch+1}: Train Loss={total_error:.4f}, Val Loss={val_error:.4f}, "
+              f"Epoch {epoch+1}: Train Acc={train_acc[-1]*100:.2f}%, Val Acc={val_acc[-1]*100:.2f}%")
+        
+    return weights, train_loss, train_acc, val_loss, val_acc
+
+# Split dataset into train:test 80:20 proportionally 
+# iris-setosa(40:10) and -versicolor(40:10)
+def split_data(data, train_ratio=0.8):
+    class0 = [row for row in data if row[-1]==0]
+    class1 = [row for row in data if row[-1]==1]
+    split0 = int(len(class0) * train_ratio)
+    split1 = int(len(class1) * train_ratio)
+    train_data = class0[:split0] + class1[:split1]
+    test_data = class0[split0:] + class1[split1:]
+    
+    return train_data, test_data
+
+# main program
+def main():
+    filename = "data_iris.csv"
+    data = load_csv(filename)
+    train_data, test_data = split_data(data, train_ratio=0.8)
+    print(f"Train size: {len(train_data)}, Test size: {len(test_data)}")
+    
+    # Training
+    weights, train_loss, train_acc, val_loss, val_acc = train_slp(train_data, test_data, lr=0.1, epochs=5)
+    
+    # Plot grafik
+    epochs = range(1, len(train_loss)+1)
+
+    plt.figure(figsize=(12,5))
+
+    # Plot Loss
+    plt.subplot(1,2,1)
+    plt.plot(epochs, train_loss, label="Train Loss")
+    plt.plot(epochs, val_loss, label="Val Loss")
+    plt.xlabel("Epoch")
+    plt.ylabel("Loss (SSE)")
+    plt.title("Loss")
+    plt.legend()
+    plt.xticks([1,2,3,4,5])
+
+    # Plot Akurasi
+    plt.subplot(1,2,2)
+    plt.plot(epochs, train_acc, label="Train Acc")
+    plt.plot(epochs, val_acc, label="Val Acc")
+    plt.xlabel("Epoch")
+    plt.ylabel("Accuracy")
+    plt.title("Accuracy")
+    plt.legend()
+    plt.xticks([1,2,3,4,5])
+
+    plt.tight_layout()
+    plt.show()
+
+
+if __name__ == "__main__":
+    main()
